@@ -1,0 +1,6 @@
+apiVersion: v2
+name: qwc-feature-info-service
+description: qwc-feature-info-service subchart
+type: application
+version: 0.1.0
+appVersion: "2025-lts"

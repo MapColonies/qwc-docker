@@ -1,0 +1,15 @@
+{{- if and .Values.global.sharedStorage.create (not .Values.global.sharedStorage.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-shared" .Release.Name }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.global.sharedStorage.size | quote }}
+  {{- if .Values.global.sharedStorage.storageClassName }}
+  storageClassName: {{ .Values.global.sharedStorage.storageClassName | quote }}
+  {{- end }}
+{{- end }}

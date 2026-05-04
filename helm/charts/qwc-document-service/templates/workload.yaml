@@ -1,0 +1,86 @@
+{{- if .Values.enabled }}
+{{- $name := include "qwc-service.fullname" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- if .Values.global.cloudProvider.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.global.cloudProvider.imagePullSecretName }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "qwc-service.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.command }}
+          command: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- $env := concat .Values.global.commonEnv .Values.env }}
+            {{- toYaml $env | nindent 12 }}
+          {{- if .Values.service.enabled }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              name: http
+          {{- end }}
+          {{- if or .Values.sharedStorage.subPaths .Values.extraVolumeMounts }}
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /reports
+              subPath: {{ .Values.sharedStorage.subPaths.reports }}
+            - name: shared-storage
+              mountPath: /srv/pg_service.conf
+              subPath: {{ .Values.sharedStorage.subPaths.pgServiceConf }}
+              readOnly: true
+            - name: shared-storage
+              mountPath: /srv/qwc_service/fonts
+              subPath: {{ .Values.sharedStorage.subPaths.reportFonts }}
+            - name: shared-storage
+              mountPath: /srv/qwc_service/config
+              subPath: {{ .Values.sharedStorage.subPaths.config }}
+              readOnly: true
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if or .Values.sharedStorage.subPaths .Values.extraVolumes }}
+      volumes:
+        {{- if .Values.sharedStorage.subPaths }}
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: {{ include "qwc-service.sharedPvc" $ }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+{{- end }}

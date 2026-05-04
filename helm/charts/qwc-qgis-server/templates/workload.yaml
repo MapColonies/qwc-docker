@@ -1,0 +1,117 @@
+{{- if .Values.enabled }}
+{{- $name := include "qwc-service.fullname" . }}
+{{- $hasSharedStorage := .Values.sharedStorage.subPaths }}
+{{- $hasQgisAuth := .Values.qgisAuthFiles.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- if .Values.global.cloudProvider.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.global.cloudProvider.imagePullSecretName }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "qwc-service.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.command }}
+          command: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- $env := concat .Values.global.commonEnv .Values.env }}
+            {{- toYaml $env | nindent 12 }}
+          {{- if .Values.service.enabled }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              name: http
+          {{- end }}
+          {{- if or $hasSharedStorage $hasQgisAuth .Values.extraVolumeMounts }}
+          volumeMounts:
+            {{- if $hasSharedStorage }}
+            - name: shared-storage
+              mountPath: /data
+              subPath: {{ .Values.sharedStorage.subPaths.qgsResources }}
+            - name: shared-storage
+              mountPath: /layouts
+              subPath: {{ .Values.sharedStorage.subPaths.printLayouts }}
+            - name: shared-storage
+              mountPath: /etc/postgresql-common/pg_service.conf
+              subPath: {{ .Values.sharedStorage.subPaths.pgServiceConf }}
+              readOnly: true
+            - name: shared-storage
+              mountPath: /usr/share/qgis/python/plugins/print_templates
+              subPath: {{ .Values.sharedStorage.subPaths.pluginPrintTemplates }}
+              readOnly: true
+            - name: shared-storage
+              mountPath: /usr/share/qgis/python/plugins/split_categorized
+              subPath: {{ .Values.sharedStorage.subPaths.pluginSplitCategorized }}
+              readOnly: true
+            - name: shared-storage
+              mountPath: /usr/share/qgis/python/plugins/filter_geom
+              subPath: {{ .Values.sharedStorage.subPaths.pluginFilterGeom }}
+              readOnly: true
+            - name: shared-storage
+              mountPath: /usr/share/qgis/python/plugins/clear_capabilities
+              subPath: {{ .Values.sharedStorage.subPaths.pluginClearCapabilities }}
+              readOnly: true
+            {{- end }}
+            {{- if $hasQgisAuth }}
+            - name: qgis-auth-files
+              mountPath: /var/lib/qgis/qgis-auth.db
+              subPath: {{ .Values.qgisAuthFiles.dbKey }}
+              readOnly: true
+            - name: qgis-auth-files
+              mountPath: /var/lib/qgis/qgis-auth.txt
+              subPath: {{ .Values.qgisAuthFiles.txtKey }}
+              readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if or $hasSharedStorage $hasQgisAuth .Values.extraVolumes }}
+      volumes:
+        {{- if $hasSharedStorage }}
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: {{ include "qwc-service.sharedPvc" $ }}
+        {{- end }}
+        {{- if $hasQgisAuth }}
+        - name: qgis-auth-files
+          secret:
+            secretName: {{ .Values.qgisAuthFiles.secretName }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+{{- end }}

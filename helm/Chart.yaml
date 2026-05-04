@@ -1,0 +1,64 @@
+apiVersion: v2
+name: qwc-docker
+description: Umbrella Helm chart for QWC Docker stack
+type: application
+version: 0.1.0
+appVersion: "2025-lts"
+dependencies:
+  - name: qwc-postgis
+    version: 0.1.0
+    repository: file://charts/qwc-postgis
+  - name: qwc-config-db-migrate
+    version: 0.1.0
+    repository: file://charts/qwc-config-db-migrate
+  - name: qwc-qgis-server
+    version: 0.1.0
+    repository: file://charts/qwc-qgis-server
+  - name: qwc-config-service
+    version: 0.1.0
+    repository: file://charts/qwc-config-service
+  - name: qwc-admin-gui
+    version: 0.1.0
+    repository: file://charts/qwc-admin-gui
+  - name: qwc-auth-service
+    version: 0.1.0
+    repository: file://charts/qwc-auth-service
+  - name: qwc-data-service
+    version: 0.1.0
+    repository: file://charts/qwc-data-service
+  - name: qwc-document-service
+    version: 0.1.0
+    repository: file://charts/qwc-document-service
+  - name: qwc-elevation-service
+    version: 0.1.0
+    repository: file://charts/qwc-elevation-service
+  - name: qwc-feature-info-service
+    version: 0.1.0
+    repository: file://charts/qwc-feature-info-service
+  - name: qwc-fulltext-search-service
+    version: 0.1.0
+    repository: file://charts/qwc-fulltext-search-service
+  - name: qwc-solr
+    version: 0.1.0
+    repository: file://charts/qwc-solr
+  - name: qwc-legend-service
+    version: 0.1.0
+    repository: file://charts/qwc-legend-service
+  - name: qwc-mapinfo-service
+    version: 0.1.0
+    repository: file://charts/qwc-mapinfo-service
+  - name: qwc-map-viewer
+    version: 0.1.0
+    repository: file://charts/qwc-map-viewer
+  - name: qwc-ogc-service
+    version: 0.1.0
+    repository: file://charts/qwc-ogc-service
+  - name: qwc-permalink-service
+    version: 0.1.0
+    repository: file://charts/qwc-permalink-service
+  - name: qwc-print-service
+    version: 0.1.0
+    repository: file://charts/qwc-print-service
+  - name: qwc-api-gateway
+    version: 0.1.0
+    repository: file://charts/qwc-api-gateway

@@ -1,0 +1,465 @@
+global:
+  cloudProvider:
+    dockerRegistryUrl: ''
+    imagePullSecretName: ''
+  jwt:
+    createSecret: true
+    secretKey: '' # auto generated if not setted
+  commonEnv:
+    - name: JWT_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: qwc-jwt
+          key: JWT_SECRET_KEY
+    - name: JWT_COOKIE_SAMESITE
+      value: Strict
+    - name: JWT_COOKIE_SECURE
+      value: 'True'
+  sharedStorage:
+    existingClaim: shared-ingestion-source
+    create: false
+    size: 20Gi
+    storageClassName: ''
+x-pull-policy: IfNotPresent
+x-tag-lts: latest-2025-lts
+x-svc-9090: &id003
+  enabled: true
+  type: ClusterIP
+  port: 9090
+  targetPort: 9090
+x-jwt-secret-env: &id005
+  name: JWT_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: qwc-jwt
+      key: JWT_SECRET_KEY
+x-jwt-cookie-csrf-true-env: &id004
+  name: JWT_COOKIE_CSRF_PROTECT
+  value: 'True'
+x-jwt-cookie-csrf-false-env: &id006
+  name: JWT_COOKIE_CSRF_PROTECT
+  value: 'False'
+x-jwt-cookie-samesite-env: &id007
+  name: JWT_COOKIE_SAMESITE
+  value: Strict
+x-jwt-cookie-secure-env: &id008
+  name: JWT_COOKIE_SECURE
+  value: 'True'
+x-uwsgi-command: &id001
+  - /bin/sh
+  - -c
+x-uwsgi-args: &id002
+  - 'HOME=/tmp uwsgi --http-socket :9090 --buffer-size
+    $REQ_HEADER_BUFFER_SIZE --processes $UWSGI_PROCESSES --threads
+    $UWSGI_THREADS --plugins python3 $UWSGI_EXTRA --protocol uwsgi
+    --wsgi-disable-file-wrapper --master --chdir /srv/qwc_service --virtualenv
+    /srv/qwc_service/.venv --mount $SERVICE_MOUNTPOINT=server:app
+    --manage-script-name
+
+    '
+qwc-postgis:
+  enabled: false
+  fullnameOverride: qwc-postgis
+  image:
+    repository: sourcepole/qwc-base-db
+    tag: '16'
+    pullPolicy: IfNotPresent
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 5432
+    targetPort: 5432
+  env:
+    - name: POSTGRES_PASSWORD
+      value: ''
+  sharedStorage:
+    subPaths:
+      dbData: vector/qwc-storage/db
+      demoDataSetupScript: vector/qwc-storage/demo-data/setup-demo-data.sh
+qwc-config-db-migrate:
+  enabled: false
+  fullnameOverride: qwc-config-db-migrate
+  image:
+    repository: sourcepole/qwc-base-db-migrate
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  sharedStorage:
+    subPaths:
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      demoDataPermissionsScript: vector/qwc-storage/demo-data/setup-demo-data-permissions.sh
+qwc-qgis-server:
+  enabled: true
+  fullnameOverride: qwc-qgis-server
+  image:
+    repository: nivgreen/qwc-qgis-server
+    tag: 3.40-openshift
+    pullPolicy: IfNotPresent
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  env:
+    - name: PORT
+      value: '8080'
+    - name: FCGID_EXTRA_ENV
+      value: "PRINT_LAYOUT_DIR,QGIS_AUTH_DB_DIR_PATH,QGIS_AUTH_PASSWORD_FILE"
+    - name: PRINT_LAYOUT_DIR
+      value: "/layouts"
+    - name: SSL_CERT_DIR
+      value: /etc/ssl/certs:/usr/local/share/ca-certificates/custom
+    - name: QGIS_AUTH_DB_DIR_PATH
+      value: /var/lib/qgis
+    - name: QGIS_AUTH_PASSWORD_FILE
+      value: /var/lib/qgis/qgis-auth.txt
+  extraVolumes:
+    - name: external-ca-certs
+      configMap:
+        name: qgis-extra-cas
+  extraVolumeMounts:
+    - name: external-ca-certs
+      mountPath: /usr/local/share/ca-certificates/custom
+      readOnly: true
+  qgisAuthFiles:
+    enabled: true
+    secretName: qgis-auth-files
+    dbKey: qgis-auth.db
+    txtKey: qgis-auth.txt
+    dbFilePath: files/qgis-auth/qgis-auth.db
+    masterKey: '123456'
+  sharedStorage:
+    subPaths:
+      qgsResources: vector/qwc-storage/qgs-resources
+      printLayouts: vector/qwc-storage/print-layouts
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      pluginPrintTemplates: vector/qwc-storage/qgis-server-plugins/print_templates
+      pluginSplitCategorized: vector/qwc-storage/qgis-server-plugins/split_categorized
+      pluginFilterGeom: vector/qwc-storage/qgis-server-plugins/filter_geom
+      pluginClearCapabilities: vector/qwc-storage/qgis-server-plugins/clear_capabilities
+qwc-config-service:
+  enabled: true
+  fullnameOverride: qwc-config-service
+  image:
+    repository: sourcepole/qwc-config-generator
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: INPUT_CONFIG_PATH
+      value: /srv/qwc_service/config-in
+    - name: OUTPUT_CONFIG_PATH
+      value: /srv/qwc_service/config-out
+    - name: GENERATE_DYNAMIC_KVRELS
+      value: '1'
+  sharedStorage:
+    subPaths:
+      configIn: vector/qwc-storage/config-in
+      configOut: vector/qwc-storage/config
+      qwc2: vector/qwc-storage/qwc2
+      qgsResources: vector/qwc-storage/qgs-resources
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      printLayouts: vector/qwc-storage/print-layouts
+      reports: vector/qwc-storage/reports
+qwc-admin-gui:
+  enabled: true
+  fullnameOverride: qwc-admin-gui
+  image:
+    repository: sourcepole/qwc-admin-gui
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id005
+    - *id006
+    - *id007
+    - *id008
+    - name: GROUP_REGISTRATION_ENABLED
+      value: 'True'
+    - name: DEFAULT_LOCALE
+      value: en
+  sharedStorage:
+    subPaths:
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      config: vector/qwc-storage/config
+qwc-auth-service:
+  enabled: true
+  fullnameOverride: qwc-auth-service
+  image:
+    repository: sourcepole/qwc-db-auth
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /auth
+  sharedStorage:
+    subPaths:
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      config: vector/qwc-storage/config
+qwc-data-service:
+  enabled: true
+  fullnameOverride: qwc-data-service
+  image:
+    repository: sourcepole/qwc-data-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v1/data
+    - name: ATTACHMENTS_BASE_DIR
+      value: /attachments
+  sharedStorage:
+    subPaths:
+      attachments: vector/qwc-storage/attachments
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      config: vector/qwc-storage/config
+qwc-document-service:
+  enabled: true
+  fullnameOverride: qwc-document-service
+  image:
+    repository: sourcepole/qwc-document-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v1/document
+  sharedStorage:
+    subPaths:
+      reports: vector/qwc-storage/reports
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      reportFonts: vector/qwc-storage/reports/fonts
+      config: vector/qwc-storage/config
+qwc-elevation-service:
+  enabled: true
+  fullnameOverride: qwc-elevation-service
+  image:
+    repository: sourcepole/qwc-elevation-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v1/elevation
+  sharedStorage:
+    subPaths:
+      config: vector/qwc-storage/config
+qwc-feature-info-service:
+  enabled: true
+  fullnameOverride: qwc-feature-info-service
+  image:
+    repository: sourcepole/qwc-feature-info-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v1/featureinfo
+  sharedStorage:
+    subPaths:
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      config: vector/qwc-storage/config
+      infoTemplates: vector/qwc-storage/info-templates
+qwc-fulltext-search-service:
+  enabled: true
+  fullnameOverride: qwc-fulltext-search-service
+  image:
+    repository: sourcepole/qwc-fulltext-search-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v2/search
+  sharedStorage:
+    subPaths:
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      config: vector/qwc-storage/config
+qwc-solr:
+  enabled: true
+  fullnameOverride: qwc-solr
+  image:
+    repository: solr
+    tag: 8.11-slim
+    pullPolicy: IfNotPresent
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8983
+    targetPort: 8983
+  command:
+    - docker-entrypoint.sh
+    - solr-precreate
+    - gdi
+    - /gdi_conf
+  sharedStorage:
+    subPaths:
+      gdiConfig: vector/qwc-storage/solr/configsets/gdi
+      solrData: vector/qwc-storage/solr/data
+qwc-legend-service:
+  enabled: true
+  fullnameOverride: qwc-legend-service
+  image:
+    repository: sourcepole/qwc-legend-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v1/legend
+  sharedStorage:
+    subPaths:
+      config: vector/qwc-storage/config
+      legends: vector/qwc-storage/legends
+qwc-mapinfo-service:
+  enabled: true
+  fullnameOverride: qwc-mapinfo-service
+  image:
+    repository: sourcepole/qwc-mapinfo-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v1/mapinfo
+  sharedStorage:
+    subPaths:
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      config: vector/qwc-storage/config
+qwc-map-viewer:
+  enabled: true
+  fullnameOverride: qwc-map-viewer
+  image:
+    repository: sourcepole/qwc-map-viewer
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /
+  sharedStorage:
+    subPaths:
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      config: vector/qwc-storage/config
+      qwc2Assets: vector/qwc-storage/qwc2/assets
+qwc-ogc-service:
+  enabled: true
+  fullnameOverride: qwc-ogc-service
+  image:
+    repository: sourcepole/qwc-ogc-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /ows
+  sharedStorage:
+    subPaths:
+      config: vector/qwc-storage/config
+qwc-permalink-service:
+  enabled: true
+  fullnameOverride: qwc-permalink-service
+  image:
+    repository: sourcepole/qwc-permalink-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v1/permalink
+  sharedStorage:
+    subPaths:
+      pgServiceConf: vector/qwc-storage/pg_service.conf
+      config: vector/qwc-storage/config
+qwc-print-service:
+  enabled: true
+  fullnameOverride: qwc-print-service
+  image:
+    repository: sourcepole/qwc-print-service
+    tag: latest-2025-lts
+    pullPolicy: IfNotPresent
+  command: *id001
+  args: *id002
+  service: *id003
+  env:
+    - *id004
+    - name: SERVICE_MOUNTPOINT
+      value: /api/v1/print
+  sharedStorage:
+    subPaths:
+      config: vector/qwc-storage/config
+qwc-api-gateway:
+  enabled: true
+  fullnameOverride: qwc-api-gateway
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: stable
+    pullPolicy: IfNotPresent
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  ingress:
+    enabled: false
+    className: ''
+    host: ''
+    path: /
+    pathType: Prefix
+  route:
+    enabled: true
+    host: ''
+    path: /
+    wildcardPolicy: None
+    tls:
+      enabled: true
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+  extraVolumes:
+    - name: nginx-config
+      configMap:
+        name: qwc-api-gateway-nginx
+  extraVolumeMounts:
+    - name: nginx-config
+      mountPath: /etc/nginx/conf.d/default.conf
+      subPath: nginx.conf
+      readOnly: true

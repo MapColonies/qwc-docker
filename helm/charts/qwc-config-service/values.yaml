@@ -1,0 +1,37 @@
+enabled: true
+fullnameOverride: ''
+replicaCount: 1
+image:
+  repository: ''
+  tag: latest
+  pullPolicy: IfNotPresent
+service:
+  enabled: true
+  type: ClusterIP
+  port: 9090
+  targetPort: 9090
+env: []
+command: []
+args: []
+resources: {}
+podAnnotations: {}
+extraVolumes: []
+extraVolumeMounts: []
+sharedStorage:
+  subPaths:
+    configIn: vector/qwc-storage/config-in
+    configOut: vector/qwc-storage/config
+    qwc2: vector/qwc-storage/qwc2
+    qgsResources: vector/qwc-storage/qgs-resources
+    pgServiceConf: vector/qwc-storage/pg_service.conf
+    printLayouts: vector/qwc-storage/print-layouts
+    reports: vector/qwc-storage/reports
+configMap:
+  enabled: false
+  data: {}
+ingress:
+  enabled: false
+  className: ''
+  host: ''
+  path: /
+  pathType: Prefix

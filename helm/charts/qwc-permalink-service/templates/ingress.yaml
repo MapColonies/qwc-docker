@@ -1,0 +1,21 @@
+{{- if and .Values.enabled .Values.ingress.enabled .Values.service.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "qwc-service.fullname" . }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            pathType: {{ .Values.ingress.pathType }}
+            backend:
+              service:
+                name: {{ include "qwc-service.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

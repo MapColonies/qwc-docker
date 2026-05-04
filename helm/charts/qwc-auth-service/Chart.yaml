@@ -1,0 +1,6 @@
+apiVersion: v2
+name: qwc-auth-service
+description: qwc-auth-service subchart
+type: application
+version: 0.1.0
+appVersion: "2025-lts"
