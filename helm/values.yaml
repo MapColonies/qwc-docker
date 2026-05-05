@@ -103,7 +103,7 @@ qwc-qgis-server:
     - name: PORT
       value: '8080'
     - name: FCGID_EXTRA_ENV
-      value: "PRINT_LAYOUT_DIR,QGIS_AUTH_DB_DIR_PATH,QGIS_AUTH_PASSWORD_FILE"
+      value: "PRINT_LAYOUT_DIR,QGIS_AUTH_DB_DIR_PATH,QGIS_AUTH_PASSWORD_FILE,SSL_CERT_DIR"
     - name: PRINT_LAYOUT_DIR
       value: "/layouts"
     - name: SSL_CERT_DIR
